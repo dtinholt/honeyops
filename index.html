@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Honeywell Agent Zero — Agentic AI Command Center</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --navy-900: #0A1628; --navy-800: #0D1F3C; --navy-700: #112240; --navy-600: #1B3A5C;
+      --teal: #00BFB3; --teal-dark: #008C82; --amber: #F5A623; --green: #4CAF50; --red: #FF5252;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif; background:var(--navy-900); color:#E2E8F0; overflow:hidden; height:100vh; }
+    #root { height:100vh; }
+    ::-webkit-scrollbar { width:5px; }
+    ::-webkit-scrollbar-track { background:rgba(255,255,255,0.03); }
+    ::-webkit-scrollbar-thumb { background:rgba(0,191,179,0.25); border-radius:3px; }
+
+    @keyframes fadeInUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+    @keyframes slideUp { from{opacity:0;transform:translateY(40px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+    @keyframes glow { 0%,100%{box-shadow:0 0 0 0 rgba(0,191,179,.35)} 50%{box-shadow:0 0 0 8px rgba(0,191,179,0)} }
+    @keyframes glowAmber { 0%,100%{box-shadow:0 0 0 0 rgba(245,166,35,.35)} 50%{box-shadow:0 0 0 8px rgba(245,166,35,0)} }
+    @keyframes dash { to{stroke-dashoffset:-20} }
+    @keyframes typewriterCursor { 0%,100%{opacity:1} 50%{opacity:0} }
+    @keyframes countPop { 0%{transform:scale(1)} 50%{transform:scale(1.12)} 100%{transform:scale(1)} }
+    @keyframes batchPulse { 0%,100%{border-color:rgba(0,191,179,.25)} 50%{border-color:rgba(0,191,179,.6)} }
+
+    .anim-fade-up { animation:fadeInUp .45s ease-out both }
+    .anim-fade { animation:fadeIn .35s ease-out both }
+    .anim-slide-up { animation:slideUp .5s ease-out both }
+    .glow-teal { animation:glow 2s ease-in-out infinite }
+    .glow-amber { animation:glowAmber 2s ease-in-out infinite }
+    .active-line { stroke-dasharray:8 4; animation:dash .6s linear infinite }
+    .idle-line { stroke-dasharray:4 4; opacity:.25 }
+    .cursor-blink::after { content:'█'; color:var(--teal); animation:typewriterCursor .7s step-end infinite }
+    .count-pop { animation:countPop .35s ease-out }
+    .batch-ring { animation:batchPulse 1.2s ease-in-out infinite }
+
+    .glass { background:linear-gradient(135deg,rgba(17,34,64,.82),rgba(27,58,92,.55)); border:1px solid rgba(0,191,179,.12); border-radius:12px; backdrop-filter:blur(8px) }
+    .glass-dark { background:linear-gradient(135deg,rgba(10,22,40,.9),rgba(17,34,64,.78)); border:1px solid rgba(0,191,179,.08); border-radius:8px }
+    .kpi-card { background:linear-gradient(135deg,rgba(17,34,64,.88),rgba(27,58,92,.65)); border:1px solid rgba(0,191,179,.18); border-radius:12px; transition:all .25s }
+    .kpi-card:hover { border-color:rgba(0,191,179,.38); transform:translateY(-2px) }
+
+    .btn { padding:6px 14px; border-radius:8px; font-size:12px; font-weight:500; cursor:pointer; transition:all .2s; border:1px solid rgba(0,191,179,.25); background:linear-gradient(135deg,#0D2847,#1B3A5C); color:#E2E8F0 }
+    .btn:hover { border-color:var(--teal); transform:translateY(-1px) }
+    .btn:disabled { opacity:.35; cursor:not-allowed; transform:none }
+    .btn-primary { background:linear-gradient(135deg,var(--teal),var(--teal-dark)); border-color:transparent; color:#fff }
+    .btn-primary:hover { filter:brightness(1.12) }
+
+    .tab { padding:8px 0; font-size:11px; font-weight:500; cursor:pointer; border-bottom:2px solid transparent; color:#64748B; transition:all .2s; background:none; border-top:none; border-left:none; border-right:none }
+    .tab:hover { color:#94A3B8 }
+    .tab-active { color:var(--teal); border-bottom-color:var(--teal) }
+
+    .mode-btn { padding:5px 12px; font-size:11px; font-weight:500; cursor:pointer; border:1px solid rgba(255,255,255,.1); background:transparent; color:#64748B; transition:all .2s }
+    .mode-btn:hover { border-color:rgba(0,191,179,.3); color:#94A3B8 }
+    .mode-active { background:rgba(0,191,179,.12); border-color:var(--teal); color:var(--teal) }
+
+    .sev-p1 { color:var(--red) } .sev-p2 { color:var(--amber) } .sev-p3 { color:var(--teal) }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback,useMemo} = React;
+
+/* ══════════════════ DATA ══════════════════ */
+const ASSESSMENT = {
+  totalIncidents:66134, totalTATHrs:4047040, avgTATHrs:61.2, dlRange:'26.2%–53.6%',
+  streams:[
+    {name:'ATR',tat:48,dlLow:12,dlHigh:25,incidents:18200},
+    {name:'SCM',tat:35,dlLow:8,dlHigh:14,incidents:22400},
+    {name:'OTC',tat:22,dlLow:6,dlHigh:10,incidents:12800},
+    {name:'STP',tat:8,dlLow:4,dlHigh:6,incidents:5100},
+    {name:'Other',tat:12,dlLow:4,dlHigh:6,incidents:7634},
+  ],
+  themes:[
+    {label:'IDoc / EDI failure & reprocess',codes:'BD87/WE02',count:42852},
+    {label:'PO / Procurement processing',codes:'ME21N/ME22N/ME23N',count:29049},
+    {label:'Billing/Invoice issues',codes:'VF01/VF02',count:9912},
+    {label:'Sales order / delivery issues',codes:'VA01/VA02/VL01N',count:9704},
+    {label:'HR/time entry',codes:'PA30/CATS',count:7643},
+  ],
+};
+
+const INIT_KPI = {resolved:0,avgMin:0,dlPct:0,saved:0,queue:66134,autonomous:0,escalations:0};
+
+const SCENARIOS = {
+  idoc:{
+    type:'idoc',title:'IDoc Failed / Reprocess Required',stream:'SCM',severity:'P2',
+    agent:'IDoc Resolution Agent',agentColor:'#00BFB3',
+    desc:'IDoc #4500089231 stuck in status 51 — Application document not posted. Vendor EDI partner VENDOR_EDI_001.',
+    confidence:94.2,sop:'SOP-SCM-IDOC-001',codes:['BD87','WE02'],batch:true,
+    steps:[
+      {label:'Classification',icon:'1',dur:1600,lines:[
+        {t:'─── AGENT ZERO · IDoc Resolution Agent ───',s:'h'},
+        {t:'Receiving ticket from ServiceNow queue...',s:'i'},
+        {t:'Category: IDoc/EDI Processing Failure',s:'i'},
+        {t:'SAP System: PRD 100 | Client: 800',s:'d'},
+        {t:'Pattern Match: 94.2% → SOP-SCM-IDOC-001',s:'g'},
+      ]},
+      {label:'Root Cause Analysis',icon:'2',dur:2000,lines:[
+        {t:'── Root Cause Analysis ──',s:'h'},
+        {t:'Querying SAP: WE02 → IDoc #4500089231',s:'c'},
+        {t:'  Status: 51 (Application document not posted)',s:'w'},
+        {t:'  Message Type: ORDERS05',s:'d'},
+        {t:'  Sender: VENDOR_EDI_001 → Receiver: SAP_PRD',s:'d'},
+        {t:'Checking error log (SM21)...',s:'c'},
+        {t:'  Error: Material mapping missing for MAT-99201',s:'e'},
+        {t:'RCA Complete: Missing material cross-reference',s:'g'},
+      ]},
+      {label:'SOP Execution',icon:'3',dur:1800,lines:[
+        {t:'── Executing SOP-SCM-IDOC-001 ──',s:'h'},
+        {t:'Action 1: Creating material cross-reference...',s:'c'},
+        {t:'  T-Code: VD51 → Adding MAT-99201 mapping',s:'i'},
+        {t:'  Cross-reference created successfully ✓',s:'g'},
+        {t:'Action 2: Initiating IDoc reprocess via BD87...',s:'c'},
+      ]},
+      {label:'SAP Execution',icon:'4',dur:2200,lines:[
+        {t:'── SAP Transaction Execution ──',s:'h'},
+        {t:'Executing BD87 reprocess...',s:'c'},
+        {t:'  ████████████████████████ 100%',s:'p'},
+        {t:'  IDoc 4500089231 reprocessed',s:'i'},
+        {t:'  New Status: 53 (Application document posted) ✓',s:'g'},
+        {t:'Purchase Order 4500089231 created in SAP',s:'g'},
+      ]},
+      {label:'Validation',icon:'5',dur:1400,lines:[
+        {t:'── Validation & Closure ──',s:'h'},
+        {t:'Verifying PO creation in ME23N...',s:'c'},
+        {t:'  PO 4500089231: Status ACTIVE ✓',s:'g'},
+        {t:'Updating ServiceNow ticket → Resolved',s:'i'},
+        {t:'Knowledge base updated with pattern',s:'i'},
+        {t:'══════════════════════════════════',s:'h'},
+        {t:'RESOLUTION: IDoc successfully reprocessed',s:'g'},
+        {t:'Total Resolution Time: 3.8 minutes',s:'g'},
+        {t:'Digital Labor: Fully Autonomous ✓',s:'g'},
+      ]},
+    ],
+    impact:{resolved:1,avgMin:3.8,dlPct:0.8,saved:125,autonomous:1},
+    kb:{title:'IDoc Status 51 — Missing Material Cross-Reference',body:'When IDoc fails with status 51 due to missing material mapping, create cross-reference via VD51 before reprocessing with BD87.'},
+  },
+  po:{
+    type:'po',title:'PO Processing Error — Price Discrepancy',stream:'SCM',severity:'P2',
+    agent:'PO Processing Agent',agentColor:'#3B82F6',
+    desc:'PO 4500091445 blocked due to price variance exceeding 5% tolerance. Vendor: CHEM_SUPPLY_003.',
+    confidence:89.7,sop:'SOP-SCM-PO-003',codes:['ME21N','ME22N'],batch:false,
+    steps:[
+      {label:'Classification',icon:'1',dur:1400,lines:[
+        {t:'─── AGENT ZERO · PO Processing Agent ───',s:'h'},
+        {t:'Category: Procurement Processing Error',s:'i'},
+        {t:'SAP Transaction: ME21N/ME22N',s:'i'},
+        {t:'Pattern Match: 89.7% → SOP-SCM-PO-003',s:'g'},
+      ]},
+      {label:'Price Analysis',icon:'2',dur:2000,lines:[
+        {t:'── Price Variance Analysis ──',s:'h'},
+        {t:'Querying ME23N → PO 4500091445',s:'c'},
+        {t:'  PO Price: $84.50/kg',s:'i'},
+        {t:'  Contract Price (ME33K): $79.20/kg',s:'i'},
+        {t:'  Variance: +6.7% (exceeds 5% tolerance)',s:'w'},
+        {t:'Checking recent GR prices (MB51)...',s:'c'},
+        {t:'  Last 3 GR avg: $82.10/kg (market increase)',s:'i'},
+      ]},
+      {label:'Contract Validation',icon:'3',dur:1800,lines:[
+        {t:'── Contract & Pricing Validation ──',s:'h'},
+        {t:'Active contract: 4600001234 (valid through Q2)',s:'i'},
+        {t:'Recommendation: Update info record (ME12)',s:'c'},
+        {t:'  New price: $82.10/kg (within escalation)',s:'i'},
+        {t:'Updating pricing condition ME12...',s:'c'},
+        {t:'  Info record updated ✓',s:'g'},
+      ]},
+      {label:'PO Release',icon:'4',dur:1600,lines:[
+        {t:'── PO Release & Validation ──',s:'h'},
+        {t:'Updating PO price via ME22N...',s:'c'},
+        {t:'  PO 4500091445 price updated to $82.10/kg ✓',s:'g'},
+        {t:'Releasing PO for processing...',s:'c'},
+        {t:'  PO Status: Released ✓',s:'g'},
+        {t:'══════════════════════════════════',s:'h'},
+        {t:'RESOLUTION: PO released with corrected pricing',s:'g'},
+        {t:'Total Resolution Time: 5.1 minutes',s:'g'},
+      ]},
+    ],
+    impact:{resolved:1,avgMin:5.1,dlPct:0.6,saved:110,autonomous:1},
+    kb:{title:'PO Price Variance — Contract Escalation','body':'Validate PO price against contract escalation clauses. Update info record via ME12 if within clause limits.'},
+  },
+  billing:{
+    type:'billing',title:'Credit Memo Request — High Value ($14,200)',stream:'OTC',severity:'P2',
+    agent:'Billing Agent',agentColor:'#F5A623',
+    desc:'Customer 4400291 (ACME Industries) requesting credit memo for $14,200 due to quantity discrepancy on Invoice 9000145672.',
+    confidence:91.5,sop:'SOP-OTC-BILL-002',codes:['VF01','VF02'],batch:false,hitlStep:2,
+    steps:[
+      {label:'Classification',icon:'1',dur:1400,lines:[
+        {t:'─── AGENT ZERO · Billing Agent ───',s:'h'},
+        {t:'Category: Billing/Invoice — Credit Memo',s:'i'},
+        {t:'Customer: 4400291 (ACME Industries)',s:'d'},
+        {t:'Pattern Match: 91.5% → SOP-OTC-BILL-002',s:'g'},
+      ]},
+      {label:'Invoice Analysis',icon:'2',dur:2200,lines:[
+        {t:'── Invoice & Delivery Analysis ──',s:'h'},
+        {t:'Querying VF03 → Invoice 9000145672',s:'c'},
+        {t:'  Invoice Amount: $47,800.00',s:'i'},
+        {t:'Checking delivery VL03N → 8000234561',s:'c'},
+        {t:'  Line 20: Ordered 500 EA, Delivered 320 EA',s:'w'},
+        {t:'  Qty discrepancy confirmed: 180 EA short',s:'w'},
+        {t:'Credit amount validated: $14,200.00',s:'i'},
+        {t:'Customer standing: Good | Payment: On-time',s:'g'},
+      ]},
+      {label:'HITL Approval',icon:'⚠',dur:0,hitl:true,
+        hitlData:{
+          title:'Human-in-the-Loop Checkpoint',
+          msg:'Credit memo of $14,200 exceeds the $10,000 auto-approval threshold.',
+          details:[
+            ['Customer','4400291 — ACME Industries'],
+            ['Invoice','9000145672'],
+            ['Credit Amount','$14,200.00'],
+            ['Reason','Quantity discrepancy (180 EA short)'],
+            ['Customer Standing','Good — On-time payment history'],
+          ],
+          rec:'APPROVE — Quantity discrepancy confirmed via delivery records. Customer has excellent payment history.',
+        },
+        lines:[
+          {t:'── ⚠ HUMAN-IN-THE-LOOP CHECKPOINT ──',s:'w'},
+          {t:'Credit memo $14,200 exceeds $10K auto-approval',s:'w'},
+          {t:'Agent recommendation: APPROVE',s:'i'},
+          {t:'Awaiting human decision...',s:'d'},
+        ],
+      },
+      {label:'Credit Memo Creation',icon:'4',dur:1800,lines:[
+        {t:'── Credit Memo Processing ──',s:'h'},
+        {t:'Human decision received: APPROVED ✓',s:'g'},
+        {t:'Creating credit memo via VF01...',s:'c'},
+        {t:'  Amount: $14,200.00 (credit)',s:'i'},
+        {t:'  Credit Memo 9000145891 created ✓',s:'g'},
+        {t:'Posting via VF02...',s:'c'},
+        {t:'  Accounting document 5100098234 posted ✓',s:'g'},
+      ]},
+      {label:'Validation',icon:'5',dur:1200,lines:[
+        {t:'── Validation & Closure ──',s:'h'},
+        {t:'Verifying FBL5N (customer line items)...',s:'c'},
+        {t:'  Credit memo reflected in account ✓',s:'g'},
+        {t:'Customer notification sent ✓',s:'i'},
+        {t:'══════════════════════════════════',s:'h'},
+        {t:'RESOLUTION: Credit memo posted & verified',s:'g'},
+        {t:'Resolution: Agent-assisted (HITL approval)',s:'i'},
+        {t:'Total Resolution Time: 6.4 minutes',s:'g'},
+      ]},
+    ],
+    impact:{resolved:1,avgMin:6.4,dlPct:0.5,saved:95,autonomous:0},
+    kb:{title:'High-Value Credit Memo — HITL Approval Flow',body:'Credit memos >$10K require HITL approval per governance policy. Agent pre-validates delivery records and customer history.'},
+  },
+  sales:{
+    type:'sales',title:'Sales Order Delivery Failure — Batch Error',stream:'OTC',severity:'P1',
+    agent:'Order Fulfillment Agent',agentColor:'#8B5CF6',
+    desc:'Delivery 8000234890 failed at goods issue. Batch determination failed for material MED-78901.',
+    confidence:87.3,sop:'SOP-OTC-DEL-004',codes:['VA01','VL01N'],batch:false,
+    steps:[
+      {label:'Classification',icon:'1',dur:1400,lines:[
+        {t:'─── AGENT ZERO · Order Fulfillment Agent ───',s:'h'},
+        {t:'Priority: P1 — Sales Order Delivery Failure',s:'e'},
+        {t:'Customer: PHARMA_DIST_007 (Priority account)',s:'w'},
+        {t:'Pattern Match: 87.3% → SOP-OTC-DEL-004',s:'g'},
+      ]},
+      {label:'Delivery Investigation',icon:'2',dur:2000,lines:[
+        {t:'── Delivery Analysis ──',s:'h'},
+        {t:'Querying VL03N → Delivery 8000234890',s:'c'},
+        {t:'  GI Status: Failed at PGI step',s:'e'},
+        {t:'  Error: Batch determination failed',s:'w'},
+        {t:'Checking material MED-78901 (MSC3N)...',s:'c'},
+        {t:'  Available batches: B-2024-001 (420 EA)',s:'i'},
+        {t:'Root cause: Batch search strategy misconfigured',s:'w'},
+      ]},
+      {label:'Configuration Fix',icon:'3',dur:1800,lines:[
+        {t:'── Configuration Correction ──',s:'h'},
+        {t:'Updating batch search strategy (MBC1)...',s:'c'},
+        {t:'  Batch B-2024-001 assigned to delivery ✓',s:'g'},
+        {t:'Retrying goods issue (VL02N)...',s:'c'},
+        {t:'  ████████████████████████ 100%',s:'p'},
+        {t:'  PGI completed successfully ✓',s:'g'},
+      ]},
+      {label:'Validation',icon:'4',dur:1400,lines:[
+        {t:'── Validation & Closure ──',s:'h'},
+        {t:'Delivery 8000234890: Goods issued ✓',s:'g'},
+        {t:'Sales order VA03 → Status: Completed ✓',s:'g'},
+        {t:'Customer notification: Shipment confirmed',s:'i'},
+        {t:'══════════════════════════════════',s:'h'},
+        {t:'RESOLUTION: Delivery completed after batch fix',s:'g'},
+        {t:'Total Resolution Time: 4.9 minutes',s:'g'},
+      ]},
+    ],
+    impact:{resolved:1,avgMin:4.9,dlPct:0.7,saved:135,autonomous:1},
+    kb:{title:'Delivery GI Failure — Batch Determination',body:'Batch determination failures at PGI often caused by search strategy misconfiguration. Verify MBC1 settings.'},
+  },
+  hr:{
+    type:'hr',title:'Timesheet Entry Error — Period Lock',stream:'Other',severity:'P3',
+    agent:'HR Systems Agent',agentColor:'#EC4899',
+    desc:'Employee 10045672 unable to submit timesheet. Error: Posting period locked for cost center 4100-CC-MFG.',
+    confidence:92.8,sop:'SOP-HR-TIME-001',codes:['PA30','CATS'],batch:false,
+    steps:[
+      {label:'Classification',icon:'1',dur:1400,lines:[
+        {t:'─── AGENT ZERO · HR Systems Agent ───',s:'h'},
+        {t:'Category: HR/Time Entry Error',s:'i'},
+        {t:'Employee: 10045672 (Manufacturing)',s:'d'},
+        {t:'Pattern Match: 92.8% → SOP-HR-TIME-001',s:'g'},
+      ]},
+      {label:'Period Analysis',icon:'2',dur:1800,lines:[
+        {t:'── Period & Cost Center Analysis ──',s:'h'},
+        {t:'Checking posting period (OB52)...',s:'c'},
+        {t:'  Period 2024-02: LOCKED for CC 4100-CC-MFG',s:'w'},
+        {t:'Checking CATS profile (CATM)...',s:'c'},
+        {t:'Root cause: Period closed prematurely by batch job',s:'w'},
+      ]},
+      {label:'Period Reopening',icon:'3',dur:1600,lines:[
+        {t:'── Period Correction ──',s:'h'},
+        {t:'Reopening period via OB52...',s:'c'},
+        {t:'  CC 4100-CC-MFG: Period 2024-02 → OPEN ✓',s:'g'},
+        {t:'Validating CATS entry submission...',s:'c'},
+        {t:'  Employee 10045672: Timesheet accepted ✓',s:'g'},
+      ]},
+      {label:'Validation',icon:'4',dur:1200,lines:[
+        {t:'── Validation & Closure ──',s:'h'},
+        {t:'Timesheet validation: Hours posted correctly ✓',s:'g'},
+        {t:'Employee notified via email ✓',s:'i'},
+        {t:'══════════════════════════════════',s:'h'},
+        {t:'RESOLUTION: Period reopened, timesheet posted',s:'g'},
+        {t:'Total Resolution Time: 3.2 minutes',s:'g'},
+      ]},
+    ],
+    impact:{resolved:1,avgMin:3.2,dlPct:0.5,saved:80,autonomous:1},
+    kb:{title:'CATS Period Lock — Premature Batch Closure',body:'Premature period closure by automated batch jobs blocks timesheet entry. Resolution via OB52 period reopening.'},
+  },
+};
+
+/* Demo Run script — sequence of narrated steps */
+const DEMO_SCRIPT = [
+  {narr:"Welcome to Honeywell Agent Zero — an intelligent orchestration platform that autonomously resolves SAP operational issues with human governance built in.",action:'dashboard',wait:7000},
+  {narr:"Let's look at the challenge: 66,134 incidents per year with 61.2-hour average resolution time. Digital labor potential ranges from 26.2% to 53.6% across SAP streams.",action:'dashboard',wait:8000},
+  {narr:"The top issue? IDoc/EDI failures — 42,852 incidents. Let's switch to the live operations view and see Agent Zero handle one in real time.",action:'demo',wait:6000},
+  {narr:"Injecting an IDoc failure ticket. Watch the Master Orchestrator classify, route, and resolve it autonomously...",action:'inject_idoc',wait:3000},
+  {narr:"The IDoc Resolution Agent is analyzing the failure — querying WE02 for IDoc status, checking BD87 reprocessing logs, and identifying the root cause.",action:null,wait:10000},
+  {narr:"Agent executes the fix: creates the missing material cross-reference via VD51, then reprocesses the IDoc via BD87. Total time: under 4 minutes.",action:null,wait:10000},
+  {narr:"Resolved! Notice the KPIs updating. But here's the real power — Agent Zero detected 12 similar IDocs in the queue. Let's process them as a batch.",action:'batch',wait:6000},
+  {narr:"Watch the KPIs climb as 12 tickets resolve in seconds. This is the scale advantage of agentic AI — not one ticket at a time, but thousands.",action:null,wait:10000},
+  {narr:"Now let's see governance in action. Injecting a high-value billing ticket — a $14,200 credit memo request from ACME Industries...",action:'inject_billing',wait:4000},
+  {narr:"The Billing Agent validates the invoice and delivery records, confirms the quantity discrepancy... but the amount exceeds the $10,000 auto-approval threshold.",action:null,wait:12000},
+  {narr:"Human-in-the-Loop checkpoint: the agent pauses and presents its recommendation. A human approves, rejects, or escalates. This is AI with guardrails.",action:null,wait:10000},
+  {narr:"That's Agent Zero — autonomous resolution, human governance, and batch scale. The path to 18–20% digital labor across Honeywell's SAP operations.",action:'dashboard',wait:8000},
+];
+
+/* ══════════════════ UTILITY ══════════════════ */
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+const fmt = n => n.toLocaleString('en-US');
+const fmtUSD = n => '$'+n.toLocaleString('en-US');
+const now = () => {const d=new Date();return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`};
+
+/* ══════════════════ CHART (pure SVG) ══════════════════ */
+function HBar({data,valKey,labelKey,maxVal,h=140,barH=18,color='#00BFB3'}){
+  const mx = maxVal || Math.max(...data.map(d=>d[valKey]));
+  const gap = 6;
+  const lw = 45;
+  return (
+    <svg width="100%" height={h} viewBox={`0 0 400 ${h}`} preserveAspectRatio="xMidYMid meet">
+      {data.map((d,i)=>{
+        const y = i*(barH+gap)+4;
+        const w = (d[valKey]/mx)*320;
+        return (
+          <g key={i}>
+            <text x={lw-4} y={y+barH/2+4} textAnchor="end" fontSize="10" fill="#94A3B8">{d[labelKey]}</text>
+            <rect x={lw} y={y} width={w} height={barH} rx={4} fill={color} opacity={.85}>
+              <animate attributeName="width" from="0" to={w} dur=".7s" fill="freeze"/>
+            </rect>
+            <text x={lw+w+6} y={y+barH/2+4} fontSize="9" fill="#64748B">{typeof d[valKey]==='number'?fmt(d[valKey]):d[valKey]}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function HBarStacked({data,key1,key2,labelKey,maxVal,h=140,barH=18,c1='#008C82',c2='#00BFB3'}){
+  const mx = maxVal||Math.max(...data.map(d=>d[key2]));
+  const gap=6; const lw=45;
+  return(
+    <svg width="100%" height={h} viewBox={`0 0 400 ${h}`} preserveAspectRatio="xMidYMid meet">
+      {data.map((d,i)=>{
+        const y=i*(barH+gap)+4;
+        const lo=d[key1], hi=d[key2];
+        const w1=(lo/mx)*320;
+        const w2=((hi-lo)/mx)*320;
+        return(
+          <g key={i}>
+            <text x={lw-4} y={y+barH/2+4} textAnchor="end" fontSize="10" fill="#94A3B8">{d[labelKey]}</text>
+            <rect x={lw} y={y} width={w1} height={barH} rx={0} fill={c1} opacity={.85}>
+              <animate attributeName="width" from="0" to={w1} dur=".6s" fill="freeze"/>
+            </rect>
+            <rect x={lw+w1} y={y} width={w2} height={barH} rx={4} fill={c2} opacity={.85}>
+              <animate attributeName="width" from="0" to={w2} dur=".7s" fill="freeze"/>
+            </rect>
+            <text x={lw+w1+w2+6} y={y+barH/2+4} fontSize="9" fill="#64748B">{lo}–{hi}%</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/* ══════════════════ HEADER ══════════════════ */
+function Header({mode,setMode,demoRunning,onStartDemo,onStopDemo,apiKey,setApiKey,showApi,setShowApi}){
+  return(
+    <header style={{height:52,background:'linear-gradient(90deg,#0A1628,#0D1F3C)',borderBottom:'1px solid rgba(255,255,255,.07)',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 20px',flexShrink:0}}>
+      <div style={{display:'flex',alignItems:'center',gap:12}}>
+        <div onClick={()=>setMode('dashboard')} style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer',padding:'4px 8px',borderRadius:8,transition:'all .2s'}}
+          onMouseOver={e=>e.currentTarget.style.background='rgba(0,191,179,.08)'}
+          onMouseOut={e=>e.currentTarget.style.background='transparent'}>
+          <div style={{width:32,height:32,borderRadius:8,background:'linear-gradient(135deg,#00BFB3,#008C82)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <span style={{color:'#fff',fontWeight:700,fontSize:13}}>A0</span>
+          </div>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:'#F5A623',letterSpacing:'.5px'}}>HONEYWELL</div>
+            <div style={{fontSize:9,color:'#64748B',marginTop:-2,letterSpacing:'1.5px'}}>AGENT ZERO</div>
+          </div>
+        </div>
+        <div style={{width:1,height:24,background:'rgba(255,255,255,.08)',margin:'0 8px'}}/>
+        <span style={{fontSize:11,color:'#475569'}}>Agentic AI Command Center</span>
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:10}}>
+        {/* Demo Run button */}
+        {!demoRunning ? (
+          <button className="btn btn-primary" onClick={onStartDemo} style={{display:'flex',alignItems:'center',gap:5}}>
+            <span>▶</span> Demo Run
+          </button>
+        ) : (
+          <button className="btn" onClick={onStopDemo} style={{borderColor:'var(--red)',color:'var(--red)'}}>
+            ■ Stop Demo
+          </button>
+        )}
+
+        {/* Mode switcher */}
+        <div style={{display:'flex',borderRadius:8,overflow:'hidden',border:'1px solid rgba(255,255,255,.1)'}}>
+          {[['dashboard','📊 Dashboard'],['demo','⚡ Demo']].map(([k,l])=>(
+            <button key={k} onClick={()=>setMode(k)} className={`mode-btn ${mode===k?'mode-active':''}`}>{l}</button>
+          ))}
+        </div>
+
+        {/* API key */}
+        <div style={{position:'relative'}}>
+          <button className="mode-btn" onClick={()=>setShowApi(!showApi)} title="API Key">🔑</button>
+          {showApi&&(
+            <div className="glass" style={{position:'absolute',right:0,top:'100%',marginTop:8,width:280,padding:12,zIndex:60}}>
+              <div style={{fontSize:10,color:'#64748B',marginBottom:4}}>Anthropic API Key (optional)</div>
+              <input type="password" value={apiKey} onChange={e=>setApiKey(e.target.value)} placeholder="sk-ant-..."
+                style={{width:'100%',padding:'6px 8px',fontSize:11,background:'var(--navy-900)',border:'1px solid rgba(255,255,255,.1)',borderRadius:6,color:'#fff',outline:'none'}}/>
+              <div style={{fontSize:9,color:'#475569',marginTop:4}}>Enables live Claude AI classification for custom tickets</div>
+            </div>
+          )}
+        </div>
+
+        <div style={{display:'flex',alignItems:'center',gap:6}}>
+          <span style={{fontSize:9,color:'#475569'}}>Powered by</span>
+          <span style={{fontSize:11,fontWeight:600,color:'#00BFB3'}}>Capgemini</span>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+/* ══════════════════ TICKET INJECTOR ══════════════════ */
+function TicketInjector({onInject,disabled,customText,setCustomText,onCustom}){
+  const types=[
+    {k:'idoc',l:'IDoc Failure',c:'BD87/WE02',icon:'📨',clr:'#00BFB3'},
+    {k:'po',l:'PO Error',c:'ME21N',icon:'📦',clr:'#3B82F6'},
+    {k:'billing',l:'Billing Issue',c:'VF01/VF02',icon:'💳',clr:'#F5A623'},
+    {k:'sales',l:'Delivery Fail',c:'VA01/VL01N',icon:'🚚',clr:'#8B5CF6'},
+    {k:'hr',l:'HR/Timesheet',c:'CATS/PA30',icon:'👤',clr:'#EC4899'},
+  ];
+  return(
+    <div style={{padding:10,borderBottom:'1px solid rgba(255,255,255,.05)'}}>
+      <div style={{fontSize:9,color:'#64748B',textTransform:'uppercase',letterSpacing:1,marginBottom:6,fontWeight:500}}>
+        Inject Ticket {disabled&&<span style={{color:'var(--teal)',fontSize:9,marginLeft:6}}>● Processing...</span>}
+      </div>
+      <div style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:6}}>
+        {types.map(t=>(
+          <button key={t.k} className="btn" disabled={disabled} onClick={()=>onInject(t.k)}
+            style={{fontSize:11,padding:'4px 10px',display:'flex',alignItems:'center',gap:4,borderColor:disabled?undefined:t.clr+'40'}}>
+            {t.icon} {t.l} <span style={{fontSize:9,color:'#475569'}}>{t.c}</span>
+          </button>
+        ))}
+      </div>
+      <div style={{display:'flex',gap:5}}>
+        <input value={customText} onChange={e=>setCustomText(e.target.value)} disabled={disabled}
+          onKeyDown={e=>e.key==='Enter'&&customText.trim()&&onCustom()}
+          placeholder="Type a custom ticket description..."
+          style={{flex:1,padding:'5px 10px',fontSize:11,background:'var(--navy-900)',border:'1px solid rgba(255,255,255,.1)',borderRadius:7,color:'#fff',outline:'none'}}/>
+        <button className="btn btn-primary" disabled={disabled||!customText.trim()} onClick={onCustom}>✨ Classify</button>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════ TICKET FEED ══════════════════ */
+function TicketFeed({tickets,activeId}){
+  return(
+    <div style={{flex:'0 0 auto',maxHeight:170,overflowY:'auto',padding:10}}>
+      {tickets.length===0&&<div style={{textAlign:'center',padding:20,color:'#475569',fontSize:11}}>No tickets yet. Inject a ticket to begin.</div>}
+      {tickets.map((t,i)=>(
+        <div key={t.id} className={`glass-dark anim-fade-up`} style={{padding:8,marginBottom:5,borderColor:t.id===activeId?'rgba(0,191,179,.35)':undefined,animationDelay:i*30+'ms'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'start'}}>
+            <div style={{minWidth:0,flex:1}}>
+              <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:2}}>
+                <span style={{fontSize:9,fontFamily:'monospace',color:'#64748B'}}>{t.id}</span>
+                <span className={`sev-${t.severity.toLowerCase()}`} style={{fontSize:9,fontWeight:600}}>{t.severity}</span>
+                <span style={{fontSize:9,color:'#475569',background:'rgba(255,255,255,.04)',padding:'1px 5px',borderRadius:3}}>{t.stream}</span>
+              </div>
+              <div style={{fontSize:11,fontWeight:500,color:'#E2E8F0',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.title}</div>
+            </div>
+            <div style={{width:8,height:8,borderRadius:4,marginLeft:8,flexShrink:0,
+              background:t.status==='resolved'?'var(--green)':t.status==='hitl'?'var(--amber)':t.status==='escalated'?'var(--red)':'var(--teal)',
+            }} className={t.status==='processing'?'glow-teal':t.status==='hitl'?'glow-amber':''}/>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ══════════════════ ORCHESTRATION CANVAS ══════════════════ */
+function Canvas({flowState,activeTicket,stepIdx,agentName,agentColor}){
+  const scenario = activeTicket ? SCENARIOS[activeTicket.type] : null;
+  const steps = scenario ? scenario.steps : [];
+
+  const mainNodes = [
+    {id:'ticket',label:'Incoming Ticket',x:90,y:40,w:110,h:44},
+    {id:'orch',label:'Master Orchestrator',x:280,y:40,w:130,h:44},
+    {id:'agent',label:agentName||'Agent',x:480,y:40,w:120,h:44},
+  ];
+
+  const stepNodes = steps.map((s,i)=>({
+    id:'s'+i,label:s.label,x: 90 + (i % 3) * 195, y: 120 + Math.floor(i/3)*70, w:110, h:38, isStep:true
+  }));
+
+  const allNodes = [...mainNodes,...stepNodes];
+
+  const getState = (id) => {
+    if(flowState==='idle') return 'idle';
+    if(id==='ticket') return 'done';
+    if(id==='orch') return flowState==='analyzing'?'active':'done';
+    if(id==='agent'){
+      if(flowState==='routing') return 'active';
+      if(flowState==='resolved') return 'done';
+      if(flowState==='escalated') return 'esc';
+      if(flowState==='processing'||flowState==='hitl') return 'active';
+      return flowState!=='idle'?'done':'idle';
+    }
+    if(id.startsWith('s')){
+      const si=parseInt(id.slice(1));
+      if(flowState==='resolved') return 'done';
+      if(flowState==='escalated') return si<=stepIdx?'esc':'idle';
+      if(si<stepIdx) return 'done';
+      if(si===stepIdx) return flowState==='hitl'?'hitl':'active';
+      return 'idle';
+    }
+    return 'idle';
+  };
+
+  const fills={idle:['#1B3A5C','#2D4F73','#64748B'],active:['#0D3B3A','#00BFB3','#00BFB3'],done:['#0D3B2A','#4CAF50','#4CAF50'],hitl:['#3B2A0D','#F5A623','#F5A623'],esc:['#3B1A1A','#FF5252','#FF5252']};
+
+  const edges = [];
+  edges.push(['ticket','orch'],['orch','agent']);
+  if(steps.length>0) edges.push(['agent','s0']);
+  for(let i=0;i<steps.length-1;i++) edges.push(['s'+i,'s'+(i+1)]);
+
+  const findNode = id => allNodes.find(n=>n.id===id);
+  const svgH = steps.length > 3 ? 270 : steps.length > 0 ? 200 : 100;
+
+  return(
+    <div style={{flex:1,position:'relative',overflow:'hidden',minHeight:200}}>
+      <div style={{position:'absolute',inset:0,opacity:.04,backgroundImage:'radial-gradient(circle at 1px 1px,rgba(0,191,179,.4) 1px,transparent 0)',backgroundSize:'28px 28px'}}/>
+      <svg width="100%" height="100%" viewBox={`0 0 660 ${svgH}`} style={{position:'relative',zIndex:1}}>
+        <defs>
+          <marker id="arrA" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#00BFB3"/></marker>
+          <marker id="arrI" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto"><polygon points="0 0,7 2.5,0 5" fill="#2D4F73"/></marker>
+        </defs>
+        {edges.map(([fid,tid],i)=>{
+          const f=findNode(fid),t=findNode(tid);
+          if(!f||!t) return null;
+          const active = getState(fid)!=='idle';
+          const dx=t.x-f.x, dy=t.y-f.y;
+          const horiz = Math.abs(dx) > Math.abs(dy);
+          const x1=horiz?f.x+f.w/2:f.x, y1=horiz?f.y:f.y+f.h/2;
+          const x2=horiz?t.x-t.w/2:t.x, y2=horiz?t.y:t.y-t.h/2;
+          if(Math.abs(dx)>20&&Math.abs(dy)>20){
+            const path=`M${x1},${y1} C${x1},${(y1+y2)/2} ${x2},${(y1+y2)/2} ${x2},${y2}`;
+            return <path key={i} d={path} fill="none" stroke={active?'#00BFB3':'#2D4F73'} strokeWidth={active?1.5:1} className={active?'active-line':'idle-line'} markerEnd={active?'url(#arrA)':'url(#arrI)'}/>;
+          }
+          return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke={active?'#00BFB3':'#2D4F73'} strokeWidth={active?1.5:1} className={active?'active-line':'idle-line'} markerEnd={active?'url(#arrA)':'url(#arrI)'}/>;
+        })}
+        {allNodes.map(n=>{
+          const st=getState(n.id);
+          const [fill,stroke,txtC]=fills[st]||fills.idle;
+          return(
+            <g key={n.id}>
+              {st==='active'&&<rect x={n.x-n.w/2-2} y={n.y-n.h/2-2} width={n.w+4} height={n.h+4} rx={10} fill="none" stroke={stroke} strokeWidth={1} opacity={.3}><animate attributeName="opacity" values=".3;.08;.3" dur="2s" repeatCount="indefinite"/></rect>}
+              <rect x={n.x-n.w/2} y={n.y-n.h/2} width={n.w} height={n.h} rx={8} fill={fill} stroke={stroke} strokeWidth={st==='idle'?1:1.5}/>
+              <text x={n.x} y={n.y+(n.isStep?4:5)} textAnchor="middle" fontSize={n.isStep?9:10} fill={txtC} fontWeight="500" fontFamily="Inter,sans-serif">{n.label}</text>
+            </g>
+          );
+        })}
+      </svg>
+      <div style={{position:'absolute',bottom:4,left:10,display:'flex',gap:12}}>
+        {[['Idle','#6B7280'],['Processing','#00BFB3'],['HITL','#F5A623'],['Resolved','#4CAF50'],['Escalated','#FF5252']].map(([l,c])=>(
+          <div key={l} style={{display:'flex',alignItems:'center',gap:3}}>
+            <div style={{width:6,height:6,borderRadius:3,background:c}}/>
+            <span style={{fontSize:8,color:'#475569'}}>{l}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════ TERMINAL ══════════════════ */
+function Terminal({lines,streaming}){
+  const ref=useRef(null);
+  useEffect(()=>{ref.current?.scrollIntoView({behavior:'smooth'})},[lines]);
+  const styles={
+    h:{color:'#00BFB3',fontWeight:600},
+    i:{color:'#60A5FA'},
+    c:{color:'#22D3EE'},
+    g:{color:'#4ADE80'},
+    w:{color:'#FBBF24'},
+    e:{color:'#F87171'},
+    d:{color:'#64748B'},
+    p:{color:'#00BFB3',fontFamily:'monospace'},
+  };
+  return(
+    <div style={{flex:1,overflowY:'auto',padding:12,fontFamily:'monospace',fontSize:11,lineHeight:'1.7',background:'rgba(5,10,20,.45)'}}>
+      {lines.length===0&&<div style={{textAlign:'center',padding:40,color:'#475569',fontSize:11}}>
+        <div style={{fontSize:24,marginBottom:10}}>⚡</div>
+        <div style={{fontWeight:600,color:'#94A3B8',marginBottom:6}}>Agent Terminal</div>
+        <div style={{fontSize:10,color:'#475569',lineHeight:1.6}}>When a ticket is injected, you'll see the agent's<br/>reasoning chain, SAP calls, and resolution steps stream here in real time.</div>
+      </div>}
+      {lines.map((l,i)=>(
+        <div key={i} className="anim-fade" style={styles[l.s]||{}}>
+          <span style={{color:'#334155',marginRight:8}}>[{l.time||now()}]</span>{l.t}
+        </div>
+      ))}
+      {streaming&&<span className="cursor-blink" style={{color:'#475569'}}> </span>}
+      <div ref={ref}/>
+    </div>
+  );
+}
+
+/* ══════════════════ KPI PANEL ══════════════════ */
+function KPIPanel({kpi}){
+  const avg = kpi.resolved>0?(kpi.avgMin/kpi.resolved).toFixed(1):'0.0';
+  const dl = kpi.dlPct.toFixed(1);
+  return(
+    <div style={{flex:1,overflowY:'auto',padding:10}}>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+        {[
+          ['Tickets Resolved',kpi.resolved,'','🎫','#00BFB3'],
+          ['Avg Resolution',avg,'min','⏱','#3B82F6'],
+          ['Digital Labor',dl,'%','🤖','#F5A623'],
+          ['Cost Saved',fmtUSD(kpi.saved),'','💰','#4CAF50'],
+        ].map(([label,val,unit,icon,color])=>(
+          <div key={label} className="kpi-card" style={{padding:10}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+              <span style={{fontSize:9,color:'#64748B',textTransform:'uppercase',letterSpacing:'.5px'}}>{label}</span>
+              <span style={{fontSize:13}}>{icon}</span>
+            </div>
+            <div style={{display:'flex',alignItems:'end',gap:3}}>
+              <span className="count-pop" style={{fontSize:20,fontWeight:700,color}}>{val}</span>
+              {unit&&<span style={{fontSize:10,color:'#64748B',marginBottom:2}}>{unit}</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="glass-dark" style={{padding:10,marginBottom:10}}>
+        <div style={{fontSize:9,color:'#64748B',textTransform:'uppercase',letterSpacing:.5,marginBottom:6}}>Before vs. With Agent Zero</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,fontSize:11}}>
+          <div>
+            <div style={{color:'#64748B',marginBottom:4,fontWeight:500}}>Before</div>
+            <div style={{display:'flex',justifyContent:'space-between'}}><span style={{color:'#94A3B8'}}>Avg TAT</span><span style={{color:'var(--red)'}}>61.2 hrs</span></div>
+            <div style={{display:'flex',justifyContent:'space-between'}}><span style={{color:'#94A3B8'}}>Digital Labor</span><span style={{color:'var(--red)'}}>0%</span></div>
+            <div style={{display:'flex',justifyContent:'space-between'}}><span style={{color:'#94A3B8'}}>Queue</span><span style={{color:'var(--red)'}}>66,134</span></div>
+          </div>
+          <div>
+            <div style={{color:'var(--teal)',marginBottom:4,fontWeight:500}}>With Agent Zero</div>
+            <div style={{display:'flex',justifyContent:'space-between'}}><span style={{color:'#94A3B8'}}>Avg TAT</span><span style={{color:'var(--green)'}}>{avg} min</span></div>
+            <div style={{display:'flex',justifyContent:'space-between'}}><span style={{color:'#94A3B8'}}>Digital Labor</span><span style={{color:'var(--green)'}}>{dl}%</span></div>
+            <div style={{display:'flex',justifyContent:'space-between'}}><span style={{color:'#94A3B8'}}>Queue</span><span style={{color:'var(--green)'}}>{fmt(kpi.queue)}</span></div>
+          </div>
+        </div>
+      </div>
+      <div className="glass-dark" style={{padding:10}}>
+        <div style={{fontSize:9,color:'#64748B',textTransform:'uppercase',letterSpacing:.5,marginBottom:6}}>Incident Volume by Stream</div>
+        <HBar data={ASSESSMENT.streams} valKey="incidents" labelKey="name" h={130}/>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════ KB PANEL ══════════════════ */
+function KBPanel({articles,activeTicket}){
+  const sc = activeTicket?SCENARIOS[activeTicket.type]:null;
+  return(
+    <div style={{flex:1,overflowY:'auto',padding:10}}>
+      {sc&&(
+        <div className="glass-dark" style={{padding:10,marginBottom:10,borderColor:'rgba(0,191,179,.25)'}}>
+          <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:6}}>
+            <span style={{fontSize:9,padding:'2px 6px',borderRadius:4,background:'rgba(0,191,179,.1)',color:'var(--teal)'}}>Active SOP</span>
+            <span style={{fontSize:9,color:'#64748B'}}>{sc.sop}</span>
+          </div>
+          <div style={{fontSize:11,fontWeight:500,color:'#E2E8F0',marginBottom:4}}>{sc.title}</div>
+          <div style={{fontSize:10,color:'#64748B',marginBottom:6}}>{sc.desc}</div>
+          <div style={{display:'flex',gap:12}}>
+            <span style={{fontSize:10}}><span style={{color:'#64748B'}}>Confidence: </span><span style={{color:'var(--teal)',fontWeight:500}}>{sc.confidence}%</span></span>
+            <span style={{fontSize:10}}><span style={{color:'#64748B'}}>SAP: </span><span style={{color:'#22D3EE'}}>{sc.codes.join(', ')}</span></span>
+          </div>
+          <div style={{marginTop:6,height:4,background:'var(--navy-900)',borderRadius:2,overflow:'hidden'}}>
+            <div style={{height:4,borderRadius:2,background:'linear-gradient(90deg,#008C82,#00BFB3)',width:sc.confidence+'%',transition:'width .5s'}}/>
+          </div>
+        </div>
+      )}
+      <div style={{fontSize:9,color:'#64748B',textTransform:'uppercase',letterSpacing:.5,marginBottom:6}}>Top Recurring Themes</div>
+      {ASSESSMENT.themes.map((th,i)=>(
+        <div key={i} className="glass-dark" style={{padding:8,marginBottom:5}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'start'}}>
+            <div><div style={{fontSize:11,color:'#E2E8F0'}}>{th.label}</div><div style={{fontSize:9,color:'#22D3EE'}}>{th.codes}</div></div>
+            <span style={{fontSize:11,fontFamily:'monospace',color:'var(--teal)'}}>{fmt(th.count)}</span>
+          </div>
+        </div>
+      ))}
+      {articles.length>0&&<>
+        <div style={{fontSize:9,color:'#64748B',textTransform:'uppercase',letterSpacing:.5,margin:'10px 0 6px'}}>Generated Knowledge Articles</div>
+        {articles.map((a,i)=>(
+          <div key={i} className="glass-dark anim-fade-up" style={{padding:8,marginBottom:5,borderColor:'rgba(76,175,80,.2)'}}>
+            <span style={{fontSize:9,padding:'1px 5px',borderRadius:3,background:'rgba(76,175,80,.1)',color:'var(--green)',marginBottom:4,display:'inline-block'}}>New</span>
+            <div style={{fontSize:11,fontWeight:500,color:'#E2E8F0'}}>{a.title}</div>
+            <div style={{fontSize:10,color:'#64748B',marginTop:2}}>{a.body}</div>
+          </div>
+        ))}
+      </>}
+    </div>
+  );
+}
+
+/* ══════════════════ HITL MODAL ══════════════════ */
+function HITLModal({data,onDecide}){
+  if(!data) return null;
+  return(
+    <div style={{position:'fixed',inset:0,zIndex:70,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,.65)',backdropFilter:'blur(3px)'}}>
+      <div className="glass anim-slide-up" style={{maxWidth:480,width:'90%',padding:24,borderColor:'rgba(245,166,35,.25)'}}>
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16}}>
+          <div style={{width:40,height:40,borderRadius:20,background:'rgba(245,166,35,.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}}>⚠️</div>
+          <div>
+            <div style={{fontSize:14,fontWeight:700,color:'var(--amber)'}}>{data.title}</div>
+            <div style={{fontSize:11,color:'#94A3B8'}}>{data.msg}</div>
+          </div>
+        </div>
+        <div style={{marginBottom:14}}>
+          {data.details.map(([k,v],i)=>(
+            <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid rgba(255,255,255,.04)',fontSize:11}}>
+              <span style={{color:'#94A3B8'}}>{k}</span><span style={{color:'#E2E8F0',fontWeight:500}}>{v}</span>
+            </div>
+          ))}
+        </div>
+        <div className="glass-dark" style={{padding:10,marginBottom:14}}>
+          <div style={{fontSize:9,color:'#64748B',textTransform:'uppercase',letterSpacing:.5,marginBottom:3}}>Agent Recommendation</div>
+          <div style={{fontSize:11,color:'var(--teal)'}}>{data.rec}</div>
+        </div>
+        <div style={{display:'flex',gap:8}}>
+          <button onClick={()=>onDecide('approve')} style={{flex:1,padding:'10px 0',borderRadius:8,fontSize:12,fontWeight:500,cursor:'pointer',background:'rgba(76,175,80,.15)',border:'1px solid rgba(76,175,80,.3)',color:'var(--green)'}}>✓ Approve</button>
+          <button onClick={()=>onDecide('reject')} style={{flex:1,padding:'10px 0',borderRadius:8,fontSize:12,fontWeight:500,cursor:'pointer',background:'rgba(255,82,82,.15)',border:'1px solid rgba(255,82,82,.3)',color:'var(--red)'}}>✕ Reject</button>
+          <button onClick={()=>onDecide('escalate')} style={{flex:1,padding:'10px 0',borderRadius:8,fontSize:12,fontWeight:500,cursor:'pointer',background:'rgba(245,166,35,.15)',border:'1px solid rgba(245,166,35,.3)',color:'var(--amber)'}}>↗ Escalate L3</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════ BATCH TOAST ══════════════════ */
+function BatchToast({onProcess,onDismiss}){
+  return(
+    <div className="glass anim-slide-up batch-ring" style={{position:'fixed',bottom:80,right:20,zIndex:50,width:300,padding:14}}>
+      <div style={{display:'flex',gap:10}}>
+        <div style={{width:32,height:32,borderRadius:16,background:'rgba(0,191,179,.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>📦</div>
+        <div>
+          <div style={{fontSize:12,fontWeight:600,color:'#E2E8F0'}}>12 Similar IDocs Detected</div>
+          <div style={{fontSize:10,color:'#64748B',marginTop:2}}>Matching pattern found in queue. Process as batch?</div>
+          <div style={{display:'flex',gap:6,marginTop:8}}>
+            <button className="btn btn-primary" style={{fontSize:11,padding:'5px 12px'}} onClick={onProcess}>⚡ Process Batch</button>
+            <button className="btn" style={{fontSize:11,padding:'5px 12px'}} onClick={onDismiss}>Dismiss</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════ NARRATION BOX ══════════════════ */
+function NarrationBox({text,stepNum,total,onPrev,onNext,onStop,progress}){
+  return(
+    <div className="glass anim-slide-up" style={{position:'fixed',bottom:20,right:20,zIndex:55,width:380,padding:16,borderColor:'rgba(0,191,179,.25)'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+        <div style={{display:'flex',alignItems:'center',gap:6}}>
+          <div style={{width:7,height:7,borderRadius:4,background:'var(--teal)'}} className="glow-teal"/>
+          <span style={{fontSize:10,fontWeight:600,color:'var(--teal)',textTransform:'uppercase',letterSpacing:.5}}>Demo Narration</span>
+        </div>
+        <span style={{fontSize:10,color:'#64748B'}}>{stepNum+1} / {total}</span>
+      </div>
+      <div style={{fontSize:12,color:'#E2E8F0',lineHeight:1.6,marginBottom:10,minHeight:50}}>{text}</div>
+      {/* Progress bar */}
+      <div style={{height:2,background:'rgba(255,255,255,.06)',borderRadius:1,marginBottom:10,overflow:'hidden'}}>
+        <div style={{height:2,background:'var(--teal)',borderRadius:1,width:progress+'%',transition:'width .3s linear'}}/>
+      </div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{display:'flex',gap:4}}>
+          {Array.from({length:total}).map((_,i)=>(
+            <div key={i} style={{width:i===stepNum?16:6,height:4,borderRadius:2,background:i<=stepNum?'var(--teal)':'rgba(255,255,255,.1)',transition:'all .3s'}}/>
+          ))}
+        </div>
+        <div style={{display:'flex',gap:5}}>
+          <button className="btn" style={{fontSize:10,padding:'3px 10px'}} onClick={onPrev} disabled={stepNum===0}>← Back</button>
+          <button className="btn" style={{fontSize:10,padding:'3px 10px'}} onClick={onNext}>{stepNum<total-1?'Next →':'Finish ✓'}</button>
+          <button className="btn" style={{fontSize:10,padding:'3px 10px',borderColor:'rgba(255,82,82,.3)',color:'var(--red)'}} onClick={onStop}>✕</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════ DASHBOARD MODE ══════════════════ */
+function Dashboard({kpi,onGoDemo,onInjectFromDash}){
+  const avg = kpi.resolved>0?(kpi.avgMin/kpi.resolved).toFixed(1):'0.0';
+  const dl = kpi.dlPct.toFixed(1);
+  const roadmap = [
+    {period:'0–3 months',title:'Stabilize & Automate',color:'#00BFB3',items:['SCM: IDoc failed / reprocess (BD87/WE02) (7,095)','STP: IDoc failed / reprocess (BD87/WE02) (619)','OTC: Monitoring alert / synthetic test (149)','SCM: Ariba/CIG PO not sent/resend/upload (61)']},
+    {period:'3–6 months',title:'Scale & Expand',color:'#3B82F6',items:['ATR: Billing / VF01/VF02 / credit memo (876)','Other: Timesheet/HR (CATS/PA30) (4,759)','SCM: EDI partner onboarding / VOE4-EDPAR (48)','OTC: PO/PR approval / release strategy (29)']},
+    {period:'6–9 months',title:'Full Coverage',color:'#8B5CF6',items:['OTC: Project/WBS (CJ20N/DP91) (35)','Other: Delivery creation / VL01N incomplete (5)','STP: Posting period/date past date (4)','Extend to remaining governed patterns']},
+  ];
+
+  return(
+    <div style={{flex:1,overflowY:'auto',padding:28}}>
+      <div style={{textAlign:'center',marginBottom:24}}>
+        <h2 style={{fontSize:22,fontWeight:700,color:'#E2E8F0',marginBottom:4}}>Assessment for Mining Digital Labor (DL) — Automation SAP</h2>
+        <p style={{fontSize:12,color:'#64748B',marginBottom:12}}>Honeywell Agent Zero · Real-time Operations Intelligence</p>
+        <button className="btn btn-primary" onClick={onGoDemo} style={{fontSize:13,padding:'8px 24px'}}>
+          ⚡ Open Live Operations View
+        </button>
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:16,marginBottom:24}}>
+        {[
+          [fmt(ASSESSMENT.totalIncidents),'Total Incidents'],
+          [fmt(ASSESSMENT.totalTATHrs),'Total Elapsed TAT (hrs)'],
+          [String(ASSESSMENT.avgTATHrs),'Avg Elapsed TAT (hrs)'],
+          [ASSESSMENT.dlRange,'DL Potential Range'],
+        ].map(([v,l])=>(
+          <div key={l} className="kpi-card" style={{padding:20,textAlign:'center'}}>
+            <div style={{fontSize:28,fontWeight:700,color:'var(--teal)'}}>{v}</div>
+            <div style={{fontSize:11,color:'#94A3B8',marginTop:4}}>{l}</div>
+          </div>
+        ))}
+      </div>
+
+      {kpi.resolved>0&&(
+        <div className="glass" style={{padding:20,marginBottom:24,borderColor:'rgba(0,191,179,.25)'}}>
+          <h3 style={{fontSize:13,fontWeight:700,color:'var(--teal)',marginBottom:12}}>Agent Zero — Live Impact</h3>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:16}}>
+            {[
+              [kpi.resolved,'Resolved This Session','#E2E8F0'],
+              [avg+' min','Avg Resolution Time','var(--green)'],
+              [dl+'%','Digital Labor','var(--amber)'],
+              [fmtUSD(kpi.saved),'Cost Saved','var(--teal)'],
+            ].map(([v,l,c])=>(
+              <div key={l} style={{textAlign:'center'}}>
+                <div style={{fontSize:22,fontWeight:700,color:c}}>{v}</div>
+                <div style={{fontSize:10,color:'#64748B',marginTop:2}}>{l}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:24}}>
+        <div className="glass" style={{padding:16}}>
+          <h3 style={{fontSize:12,fontWeight:600,color:'#E2E8F0',marginBottom:10}}>TAT Share by Process Stream (elapsed hrs)</h3>
+          <HBar data={ASSESSMENT.streams} valKey="tat" labelKey="name" h={140}/>
+        </div>
+        <div className="glass" style={{padding:16}}>
+          <h3 style={{fontSize:12,fontWeight:600,color:'#E2E8F0',marginBottom:10}}>Digital Labor Potential (range) by Stream (%)</h3>
+          <HBarStacked data={ASSESSMENT.streams} key1="dlLow" key2="dlHigh" labelKey="name" maxVal={30} h={140}/>
+        </div>
+      </div>
+
+      <div className="glass" style={{padding:16,marginBottom:24}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+          <h3 style={{fontSize:12,fontWeight:600,color:'#E2E8F0'}}>Top Recurring Themes (Overall)</h3>
+          <span style={{fontSize:10,color:'#64748B'}}>Click a theme to resolve it live →</span>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10}}>
+          {ASSESSMENT.themes.map((th,i)=>{
+            const typeMap=['idoc','po','billing','sales','hr'];
+            return(
+              <div key={i} className="glass-dark" onClick={()=>onInjectFromDash(typeMap[i])}
+                style={{padding:12,textAlign:'center',cursor:'pointer',transition:'all .2s',borderColor:'transparent'}}
+                onMouseOver={e=>{e.currentTarget.style.borderColor='rgba(0,191,179,.35)';e.currentTarget.style.transform='translateY(-2px)'}}
+                onMouseOut={e=>{e.currentTarget.style.borderColor='transparent';e.currentTarget.style.transform='none'}}>
+                <div style={{fontSize:18,fontWeight:700,color:'var(--teal)'}}>{fmt(th.count)}</div>
+                <div style={{fontSize:10,color:'#E2E8F0',marginTop:4,lineHeight:1.3}}>{th.label}</div>
+                <div style={{fontSize:9,color:'#22D3EE',marginTop:2}}>{th.codes}</div>
+                <div style={{fontSize:9,color:'var(--teal)',marginTop:6,opacity:.7}}>▶ Resolve Live</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="glass" style={{padding:16}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+          <h3 style={{fontSize:12,fontWeight:600,color:'#E2E8F0'}}>Path to 18–20% Digital Labor (3/6/9-month roadmap)</h3>
+          <span style={{fontSize:14,fontWeight:700,color:'var(--teal)'}}>Target: 18–20%</span>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12}}>
+          {roadmap.map((p,i)=>(
+            <div key={i} className="glass-dark" style={{padding:12,borderColor:p.color+'35'}}>
+              <div style={{fontSize:12,fontWeight:700,color:p.color,marginBottom:6}}>{p.period}</div>
+              <div style={{fontSize:11,fontWeight:500,color:'#E2E8F0',marginBottom:6}}>{p.title}</div>
+              {p.items.map((item,j)=>(
+                <div key={j} style={{fontSize:10,color:'#94A3B8',lineHeight:1.5,display:'flex',gap:4}}>
+                  <span style={{color:p.color}}>•</span>{item}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════ MAIN APP ══════════════════ */
+function App(){
+  const [mode,setMode] = useState('dashboard');
+  const [tickets,setTickets] = useState([]);
+  const [active,setActive] = useState(null);
+  const [flow,setFlow] = useState('idle');
+  const [stepIdx,setStepIdx] = useState(0);
+  const [lines,setLines] = useState([]);
+  const [streaming,setStreaming] = useState(false);
+  const [tab,setTab] = useState('terminal');
+  const [kpi,setKpi] = useState({...INIT_KPI});
+  const [hitl,setHitl] = useState(null);
+  const [showBatch,setShowBatch] = useState(false);
+  const [articles,setArticles] = useState([]);
+  const [apiKey,setApiKey] = useState('');
+  const [showApi,setShowApi] = useState(false);
+  const [counter,setCounter] = useState(48291);
+  const [customText,setCustomText] = useState('');
+  const [agentName,setAgentName] = useState('');
+  const [agentColor,setAgentColor] = useState('#00BFB3');
+
+  // Demo run state
+  const [demoRunning,setDemoRunning] = useState(false);
+  const [demoStep,setDemoStep] = useState(0);
+  const [demoProgress,setDemoProgress] = useState(0);
+  const demoTimerRef = useRef(null);
+  const demoProgressRef = useRef(null);
+
+  const busy = useRef(false);
+  const hitlRef = useRef(null);
+  const cancelRef = useRef(false);
+
+  const addLines = useCallback(async(arr,delay=40)=>{
+    for(const l of arr){
+      if(cancelRef.current) return;
+      setStreaming(true);
+      await sleep(delay);
+      setLines(p=>[...p,{...l,time:now()}]);
+    }
+    setStreaming(false);
+  },[]);
+
+  const bumpKpi = useCallback(imp=>{
+    setKpi(p=>({
+      resolved:p.resolved+(imp.resolved||0),
+      avgMin:p.avgMin+(imp.avgMin||0),
+      dlPct:Math.min(p.dlPct+(imp.dlPct||0),100),
+      saved:p.saved+(imp.saved||0),
+      queue:Math.max(p.queue-(imp.resolved||0),0),
+      autonomous:p.autonomous+(imp.autonomous||0),
+      escalations:p.escalations+(imp.escalations||0),
+    }));
+  },[]);
+
+  const runTicket = useCallback(async(ticket,sc)=>{
+    setFlow('analyzing');
+    setTab('terminal');
+    await addLines([{t:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',s:'h'},{t:`TICKET: ${ticket.id} — ${ticket.title}`,s:'h'},{t:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',s:'h'}],70);
+    if(cancelRef.current) return;
+    await sleep(600);
+    setFlow('routing');
+    await addLines([{t:`Master Orchestrator → ${sc.agent}`,s:'i'},{t:`Stream: ${sc.stream} | Severity: ${sc.severity}`,s:'d'}],50);
+    if(cancelRef.current) return;
+    await sleep(400);
+    setFlow('processing');
+    setTickets(p=>p.map(t=>t.id===ticket.id?{...t,status:'processing'}:t));
+
+    for(let i=0;i<sc.steps.length;i++){
+      if(cancelRef.current) return;
+      setStepIdx(i);
+      const step=sc.steps[i];
+
+      if(step.hitl){
+        setFlow('hitl');
+        setTickets(p=>p.map(t=>t.id===ticket.id?{...t,status:'hitl'}:t));
+        await addLines(step.lines,50);
+        setHitl(step.hitlData);
+        const dec = await new Promise(r=>{hitlRef.current=r});
+        setHitl(null);
+        if(dec==='reject'){
+          await addLines([{t:'Human decision: REJECTED',s:'e'},{t:'Ticket returned to queue for manual review',s:'w'}],50);
+          setFlow('idle'); setTickets(p=>p.map(t=>t.id===ticket.id?{...t,status:'escalated'}:t)); busy.current=false; return;
+        }
+        if(dec==='escalate'){
+          await addLines([{t:'Human decision: ESCALATED TO L3',s:'w'},{t:'Context packaged for L3 engineer',s:'i'},{t:'Ticket escalated to L3 queue ✓',s:'w'}],50);
+          setFlow('escalated'); setTickets(p=>p.map(t=>t.id===ticket.id?{...t,status:'escalated'}:t)); bumpKpi({escalations:1});
+          await sleep(2000); setFlow('idle'); busy.current=false; return;
+        }
+        setFlow('processing'); setTickets(p=>p.map(t=>t.id===ticket.id?{...t,status:'processing'}:t));
+        continue;
+      }
+      await addLines(step.lines,35);
+      if(cancelRef.current) return;
+      await sleep(step.dur);
+    }
+    setFlow('resolved');
+    setTickets(p=>p.map(t=>t.id===ticket.id?{...t,status:'resolved'}:t));
+    bumpKpi(sc.impact);
+    setArticles(p=>[sc.kb,...p]);
+    if(sc.batch){ await sleep(1500); setShowBatch(true); }
+    await sleep(1500);
+    setFlow('idle');
+    busy.current=false;
+  },[addLines,bumpKpi]);
+
+  const inject = useCallback(async(type)=>{
+    if(busy.current) return;
+    busy.current=true; cancelRef.current=false;
+    const sc=SCENARIOS[type];
+    const id=`INC-2024-${counter}`;
+    const ticket={id,type,title:sc.title,desc:sc.desc,stream:sc.stream,severity:sc.severity,status:'new'};
+    setCounter(p=>p+1); setTickets(p=>[ticket,...p]); setActive(ticket);
+    setAgentName(sc.agent); setAgentColor(sc.agentColor);
+    setLines([]); setStepIdx(0);
+    await runTicket(ticket,sc);
+  },[counter,runTicket]);
+
+  const handleCustom = useCallback(async()=>{
+    if(busy.current||!customText.trim()) return;
+    busy.current=true; cancelRef.current=false;
+    setLines([]); setTab('terminal'); setFlow('analyzing');
+    await addLines([{t:'━━━ CUSTOM TICKET — AI CLASSIFICATION ━━━',s:'h'},{t:`Input: "${customText}"`,s:'i'},{t:'🤖 Classifying...',s:'c'}],60);
+    await sleep(1200);
+    const kw=customText.toLowerCase();
+    let type='idoc';
+    if(kw.includes('invoice')||kw.includes('billing')||kw.includes('credit')) type='billing';
+    else if(kw.includes('purchase')||kw.includes('po ')||kw.includes('procure')) type='po';
+    else if(kw.includes('delivery')||kw.includes('sales')||kw.includes('order')) type='sales';
+    else if(kw.includes('hr')||kw.includes('time')||kw.includes('employee')) type='hr';
+    const sc=SCENARIOS[type];
+    await addLines([{t:`Classification: ${type.toUpperCase()} (${(82+Math.random()*12).toFixed(1)}%)`,s:'g'},{t:`Routing to ${sc.agent}...`,s:'i'}],60);
+    const id=`INC-2024-${counter}`;
+    const ticket={id,type,title:`[AI] ${customText.substring(0,50)}`,desc:customText,stream:sc.stream,severity:sc.severity,status:'new'};
+    setCounter(p=>p+1); setTickets(p=>[ticket,...p]); setActive(ticket);
+    setAgentName(sc.agent); setAgentColor(sc.agentColor); setStepIdx(0); setCustomText('');
+    await sleep(400);
+    await runTicket(ticket,sc);
+  },[customText,counter,addLines,runTicket]);
+
+  const handleHitl = useCallback(dec=>{
+    if(hitlRef.current){hitlRef.current(dec);hitlRef.current=null}
+  },[]);
+
+  const handleBatch = useCallback(async()=>{
+    setShowBatch(false); setTab('terminal');
+    await addLines([{t:''},{t:'━━━━ ⚡ BATCH PROCESSING — 12 Similar IDocs ━━━━',s:'h'}],60);
+    for(let i=1;i<=12;i++){
+      const id=`INC-2024-${counter+i}`;
+      await addLines([{t:`[${i}/12] ${id} — BD87 reprocess...`,s:'c'},{t:`  Status 53 ✓ | ${(2.5+Math.random()*2).toFixed(1)} min`,s:'g'}],25);
+      setKpi(p=>({...p,resolved:p.resolved+1,avgMin:p.avgMin+2.5+Math.random()*2,dlPct:Math.min(p.dlPct+.8,20),saved:p.saved+100+Math.floor(Math.random()*50),queue:Math.max(p.queue-1,0),autonomous:p.autonomous+1,escalations:p.escalations}));
+      setTickets(p=>[{id,type:'idoc',title:`IDoc Batch #${i}`,stream:'SCM',severity:'P2',status:'resolved'},...p]);
+      await sleep(250);
+    }
+    setCounter(p=>p+13);
+    await addLines([{t:'══════════════════════════════════',s:'h'},{t:'BATCH COMPLETE: 12/12 IDocs resolved ✓',s:'g'},{t:`Digital Labor climbing toward target...`,s:'g'}],60);
+  },[counter,addLines]);
+
+  /* ── Demo Run logic ── */
+  const startDemo = useCallback(()=>{
+    setDemoRunning(true);
+    setDemoStep(0);
+    setDemoProgress(0);
+    setMode('dashboard');
+    // Reset state
+    setTickets([]); setActive(null); setFlow('idle'); setLines([]); setKpi({...INIT_KPI}); setArticles([]);
+    busy.current=false; cancelRef.current=false;
+  },[]);
+
+  const stopDemo = useCallback(()=>{
+    setDemoRunning(false);
+    if(demoTimerRef.current) clearTimeout(demoTimerRef.current);
+    if(demoProgressRef.current) clearInterval(demoProgressRef.current);
+  },[]);
+
+  const advanceDemo = useCallback((step)=>{
+    const s = DEMO_SCRIPT[step];
+    if(!s) { stopDemo(); return; }
+    // Execute action
+    if(s.action==='dashboard') setMode('dashboard');
+    else if(s.action==='demo') setMode('demo');
+    else if(s.action==='inject_idoc'){ setMode('demo'); setTimeout(()=>inject('idoc'),300); }
+    else if(s.action==='inject_billing'){ setMode('demo'); setTimeout(()=>inject('billing'),300); }
+    else if(s.action==='batch'){ if(!showBatch) setShowBatch(true); }
+  },[inject,stopDemo,showBatch]);
+
+  // Auto-advance timer for demo run
+  useEffect(()=>{
+    if(!demoRunning) return;
+    const s = DEMO_SCRIPT[demoStep];
+    if(!s){ stopDemo(); return; }
+    advanceDemo(demoStep);
+    // Progress bar animation
+    setDemoProgress(0);
+    let elapsed = 0;
+    const interval = 100;
+    demoProgressRef.current = setInterval(()=>{
+      elapsed += interval;
+      setDemoProgress(Math.min((elapsed/s.wait)*100,100));
+    },interval);
+    // Auto advance
+    demoTimerRef.current = setTimeout(()=>{
+      clearInterval(demoProgressRef.current);
+      if(demoStep < DEMO_SCRIPT.length-1) setDemoStep(p=>p+1);
+      else stopDemo();
+    },s.wait);
+    return ()=>{ clearTimeout(demoTimerRef.current); clearInterval(demoProgressRef.current); };
+  },[demoStep,demoRunning,advanceDemo,stopDemo]);
+
+  const demoNext = useCallback(()=>{
+    if(demoTimerRef.current) clearTimeout(demoTimerRef.current);
+    if(demoProgressRef.current) clearInterval(demoProgressRef.current);
+    if(demoStep<DEMO_SCRIPT.length-1) setDemoStep(p=>p+1);
+    else stopDemo();
+  },[demoStep,stopDemo]);
+
+  const demoPrev = useCallback(()=>{
+    if(demoTimerRef.current) clearTimeout(demoTimerRef.current);
+    if(demoProgressRef.current) clearInterval(demoProgressRef.current);
+    if(demoStep>0) setDemoStep(p=>p-1);
+  },[demoStep]);
+
+  /* ── Render ── */
+  return(
+    <div style={{height:'100vh',display:'flex',flexDirection:'column',background:'linear-gradient(180deg,#0A1628,#0D1F3C)'}}>
+      <Header mode={mode} setMode={setMode} demoRunning={demoRunning} onStartDemo={startDemo} onStopDemo={stopDemo} apiKey={apiKey} setApiKey={setApiKey} showApi={showApi} setShowApi={setShowApi}/>
+
+      {mode==='dashboard'?(
+        <Dashboard kpi={kpi} onGoDemo={()=>setMode('demo')} onInjectFromDash={(type)=>{setMode('demo');setTimeout(()=>inject(type),300)}}/>
+      ):(
+        <div style={{flex:1,display:'flex',overflow:'hidden'}}>
+          {/* Left 60% */}
+          <div style={{width:'60%',display:'flex',flexDirection:'column',borderRight:'1px solid rgba(255,255,255,.05)'}}>
+            <TicketInjector onInject={inject} disabled={flow!=='idle'} customText={customText} setCustomText={setCustomText} onCustom={handleCustom}/>
+            {tickets.length===0 && flow==='idle' ? (
+              /* ── Welcome empty state ── */
+              <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:32,textAlign:'center',position:'relative',overflow:'hidden'}}>
+                <div style={{position:'absolute',inset:0,opacity:.03,backgroundImage:'radial-gradient(circle at 1px 1px,rgba(0,191,179,.5) 1px,transparent 0)',backgroundSize:'28px 28px'}}/>
+                <div style={{width:64,height:64,borderRadius:16,background:'linear-gradient(135deg,rgba(0,191,179,.15),rgba(0,191,179,.05))',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:16,border:'1px solid rgba(0,191,179,.2)'}}>
+                  <span style={{fontSize:28}}>🧠</span>
+                </div>
+                <h3 style={{fontSize:18,fontWeight:700,color:'#E2E8F0',marginBottom:6}}>Operations Center Ready</h3>
+                <p style={{fontSize:12,color:'#64748B',maxWidth:400,lineHeight:1.6,marginBottom:20}}>
+                  Select a ticket type above to watch Agent Zero classify, route, and resolve it in real time — or type a custom issue to see live AI classification.
+                </p>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,maxWidth:480,width:'100%',marginBottom:20}}>
+                  {[
+                    {k:'idoc',icon:'📨',label:'IDoc Failure',sub:'Most common (42,852)',clr:'#00BFB3'},
+                    {k:'billing',icon:'💳',label:'Billing Issue',sub:'HITL demo',clr:'#F5A623'},
+                    {k:'sales',icon:'🚚',label:'Delivery Failure',sub:'P1 priority',clr:'#8B5CF6'},
+                  ].map(t=>(
+                    <div key={t.k} onClick={()=>inject(t.k)} className="glass-dark"
+                      style={{padding:14,cursor:'pointer',textAlign:'center',transition:'all .2s',borderColor:'transparent'}}
+                      onMouseOver={e=>{e.currentTarget.style.borderColor=t.clr+'60';e.currentTarget.style.transform='translateY(-3px)'}}
+                      onMouseOut={e=>{e.currentTarget.style.borderColor='transparent';e.currentTarget.style.transform='none'}}>
+                      <div style={{fontSize:22,marginBottom:6}}>{t.icon}</div>
+                      <div style={{fontSize:11,fontWeight:600,color:'#E2E8F0'}}>{t.label}</div>
+                      <div style={{fontSize:9,color:t.clr,marginTop:3}}>{t.sub}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:16,fontSize:10,color:'#475569'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:4}}>
+                    <div style={{width:8,height:8,borderRadius:4,background:'var(--teal)',opacity:.5}}/>
+                    Autonomous resolution
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:4}}>
+                    <div style={{width:8,height:8,borderRadius:4,background:'var(--amber)',opacity:.5}}/>
+                    Human-in-the-Loop
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:4}}>
+                    <div style={{width:8,height:8,borderRadius:4,background:'var(--green)',opacity:.5}}/>
+                    Batch processing
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* ── Active state with feed + canvas ── */
+              <>
+                <TicketFeed tickets={tickets} activeId={active?.id}/>
+                <div style={{borderTop:'1px solid rgba(255,255,255,.05)',flex:1,display:'flex',flexDirection:'column'}}>
+                  <div style={{padding:'6px 10px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <span style={{fontSize:9,color:'#64748B',textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Orchestration Flow</span>
+                    {flow!=='idle'&&<span style={{fontSize:9,padding:'2px 8px',borderRadius:10,
+                      background:flow==='resolved'?'rgba(76,175,80,.1)':flow==='hitl'?'rgba(245,166,35,.1)':flow==='escalated'?'rgba(255,82,82,.1)':'rgba(0,191,179,.1)',
+                      color:flow==='resolved'?'var(--green)':flow==='hitl'?'var(--amber)':flow==='escalated'?'var(--red)':'var(--teal)',
+                    }}>
+                      {flow==='analyzing'?'🔍 Analyzing':flow==='routing'?'🧠 Routing':flow==='processing'?'⚡ Processing':flow==='hitl'?'⚠️ Awaiting Human':flow==='resolved'?'✅ Resolved':'🔴 Escalated'}
+                    </span>}
+                  </div>
+                  <Canvas flowState={flow} activeTicket={active} stepIdx={stepIdx} agentName={agentName} agentColor={agentColor}/>
+                </div>
+              </>
+            )}
+          </div>
+          {/* Right 40% */}
+          <div style={{width:'40%',display:'flex',flexDirection:'column'}}>
+            <div style={{display:'flex',borderBottom:'1px solid rgba(255,255,255,.05)'}}>
+              {[['terminal','⚡ Terminal'],['kpis','📊 KPIs'],['kb','📚 Knowledge']].map(([k,l])=>(
+                <button key={k} onClick={()=>setTab(k)} className={`tab ${tab===k?'tab-active':''}`} style={{flex:1}}>{l}</button>
+              ))}
+            </div>
+            {tab==='terminal'&&<Terminal lines={lines} streaming={streaming}/>}
+            {tab==='kpis'&&<KPIPanel kpi={kpi}/>}
+            {tab==='kb'&&<KBPanel articles={articles} activeTicket={active}/>}
+          </div>
+        </div>
+      )}
+
+      {hitl&&<HITLModal data={hitl} onDecide={handleHitl}/>}
+      {showBatch&&<BatchToast onProcess={handleBatch} onDismiss={()=>setShowBatch(false)}/>}
+      {demoRunning&&DEMO_SCRIPT[demoStep]&&(
+        <NarrationBox text={DEMO_SCRIPT[demoStep].narr} stepNum={demoStep} total={DEMO_SCRIPT.length} onPrev={demoPrev} onNext={demoNext} onStop={stopDemo} progress={demoProgress}/>
+      )}
+      {showApi&&<div style={{position:'fixed',inset:0,zIndex:55}} onClick={()=>setShowApi(false)}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
