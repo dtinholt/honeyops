@@ -407,6 +407,87 @@ function HBarStacked({data,key1,key2,labelKey,maxVal,h=140,barH=18,c1='#008C82',
   );
 }
 
+/* ══════════════════ LIVE QUEUE ══════════════════ */
+function LiveQueue({tickets,activeId,activeType,onPick,busy}){
+  const pendingQueue = [
+    {k:'idoc',id:'INC-2024-48284',title:'IDoc #4500089231 status 51 — document not posted',severity:'P2',stream:'SCM',age:'12m',codes:'BD87/WE02',icon:'📨',clr:'#00BFB3'},
+    {k:'po',id:'INC-2024-48285',title:'PO 4500091445 blocked — price variance 6.7%',severity:'P2',stream:'SCM',age:'34m',codes:'ME21N',icon:'📦',clr:'#3B82F6'},
+    {k:'billing',id:'INC-2024-48286',title:'Credit memo request $14,200 — ACME Industries',severity:'P2',stream:'OTC',age:'1h 8m',codes:'VF01/VF02',icon:'💳',clr:'#F5A623'},
+    {k:'sales',id:'INC-2024-48287',title:'Delivery 8000234890 GI failed — batch determination',severity:'P1',stream:'OTC',age:'6m',codes:'VA01/VL01N',icon:'🚚',clr:'#8B5CF6'},
+    {k:'hr',id:'INC-2024-48288',title:'Timesheet rejected — posting period locked CC 4100',severity:'P3',stream:'Other',age:'2h 15m',codes:'CATS/PA30',icon:'👤',clr:'#EC4899'},
+  ];
+  /* Remove types that have been picked (resolved, escalated, or currently processing) */
+  const takenTypes = new Set(tickets.map(t=>t.type));
+  const remaining = pendingQueue.filter(p=>!takenTypes.has(p.k));
+
+  return(
+    <div>
+      {/* ── Incoming queue ── */}
+      <div style={{padding:'6px 12px 2px'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <span style={{fontSize:9,color:'#64748B',textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Incoming Queue</span>
+          <span style={{fontSize:9,color:'var(--teal)'}}>{remaining.length} pending</span>
+        </div>
+      </div>
+      <div style={{padding:'0 10px 4px'}}>
+        {remaining.length===0&&(
+          <div style={{padding:'12px 0',textAlign:'center',fontSize:10,color:'#475569'}}>Queue clear — all incidents processed</div>
+        )}
+        {remaining.map(q=>{
+          const canClick = !busy;
+          return(
+            <div key={q.k} onClick={()=>canClick&&onPick(q.k)} className="glass-dark"
+              style={{padding:'7px 10px',marginBottom:3,cursor:canClick?'pointer':'default',transition:'all .15s',borderColor:'transparent',opacity:busy?.6:1}}
+              onMouseOver={e=>{if(canClick){e.currentTarget.style.borderColor=q.clr+'50';e.currentTarget.style.background='rgba(255,255,255,.03)'}}}
+              onMouseOut={e=>{e.currentTarget.style.borderColor='transparent';e.currentTarget.style.background=''}}>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <span style={{fontSize:13,flexShrink:0}}>{q.icon}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:1}}>
+                    <span style={{fontSize:9,fontFamily:'monospace',color:'#64748B'}}>{q.id}</span>
+                    <span className={`sev-${q.severity.toLowerCase()}`} style={{fontSize:8,fontWeight:600}}>{q.severity}</span>
+                    <span style={{fontSize:8,color:'#475569',background:'rgba(255,255,255,.04)',padding:'1px 4px',borderRadius:3}}>{q.stream}</span>
+                  </div>
+                  <div style={{fontSize:11,color:'#E2E8F0',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{q.title}</div>
+                </div>
+                <span style={{fontSize:9,color:'#475569',flexShrink:0}}>{q.age}</span>
+                <div style={{width:6,height:6,borderRadius:3,flexShrink:0,background:q.severity==='P1'?'var(--red)':'var(--amber)'}}/>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Active / processed ── */}
+      {tickets.length>0&&(
+        <>
+          <div style={{padding:'4px 12px 2px'}}>
+            <span style={{fontSize:9,color:'#64748B',textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Activity</span>
+          </div>
+          <div style={{padding:'0 10px 4px'}}>
+            {tickets.map((t,i)=>(
+              <div key={t.id} className="glass-dark anim-fade-up" style={{padding:'6px 10px',marginBottom:3,
+                borderColor:t.id===activeId?'rgba(0,191,179,.3)':'transparent',animationDelay:i*20+'ms'}}>
+                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                  <div style={{width:6,height:6,borderRadius:3,flexShrink:0,
+                    background:t.status==='resolved'?'var(--green)':t.status==='hitl'?'var(--amber)':t.status==='escalated'?'var(--red)':'var(--teal)',
+                  }} className={t.status==='processing'?'glow-teal':t.status==='hitl'?'glow-amber':''}/>
+                  <span style={{fontSize:9,fontFamily:'monospace',color:'#64748B'}}>{t.id}</span>
+                  <span style={{fontSize:10,color:'#CBD5E1',flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.title}</span>
+                  <span style={{fontSize:8,flexShrink:0,padding:'1px 5px',borderRadius:3,
+                    background:t.status==='resolved'?'rgba(76,175,80,.1)':t.status==='escalated'?'rgba(255,82,82,.1)':'rgba(0,191,179,.1)',
+                    color:t.status==='resolved'?'var(--green)':t.status==='escalated'?'var(--red)':'var(--teal)',
+                  }}>{t.status==='resolved'?'Resolved':t.status==='escalated'?'Escalated':t.status==='hitl'?'Awaiting Approval':'Processing...'}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ══════════════════ HEADER ══════════════════ */
 function Header({mode,setMode,demoRunning,onStartDemo,onStopDemo,apiKey,setApiKey,showApi,setShowApi}){
   return(
@@ -467,61 +548,17 @@ function Header({mode,setMode,demoRunning,onStartDemo,onStopDemo,apiKey,setApiKe
   );
 }
 
-/* ══════════════════ TICKET INJECTOR ══════════════════ */
-function TicketInjector({onInject,disabled,customText,setCustomText,onCustom}){
-  const types=[
-    {k:'idoc',l:'IDoc Failure',c:'BD87/WE02',icon:'📨',clr:'#00BFB3'},
-    {k:'po',l:'PO Error',c:'ME21N',icon:'📦',clr:'#3B82F6'},
-    {k:'billing',l:'Billing Issue',c:'VF01/VF02',icon:'💳',clr:'#F5A623'},
-    {k:'sales',l:'Delivery Fail',c:'VA01/VL01N',icon:'🚚',clr:'#8B5CF6'},
-    {k:'hr',l:'HR/Timesheet',c:'CATS/PA30',icon:'👤',clr:'#EC4899'},
-  ];
+/* ══════════════════ TICKET INJECTOR (search bar only) ══════════════════ */
+function TicketInjector({disabled,customText,setCustomText,onCustom}){
   return(
-    <div style={{padding:10,borderBottom:'1px solid rgba(255,255,255,.05)'}}>
-      <div style={{fontSize:9,color:'#64748B',textTransform:'uppercase',letterSpacing:1,marginBottom:6,fontWeight:500}}>
-        Inject Ticket {disabled&&<span style={{color:'var(--teal)',fontSize:9,marginLeft:6}}>● Processing...</span>}
-      </div>
-      <div style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:6}}>
-        {types.map(t=>(
-          <button key={t.k} className="btn" disabled={disabled} onClick={()=>onInject(t.k)}
-            style={{fontSize:11,padding:'4px 10px',display:'flex',alignItems:'center',gap:4,borderColor:disabled?undefined:t.clr+'40'}}>
-            {t.icon} {t.l} <span style={{fontSize:9,color:'#475569'}}>{t.c}</span>
-          </button>
-        ))}
-      </div>
-      <div style={{display:'flex',gap:5}}>
-        <input value={customText} onChange={e=>setCustomText(e.target.value)} disabled={disabled}
-          onKeyDown={e=>e.key==='Enter'&&customText.trim()&&onCustom()}
-          placeholder="Type a custom ticket description..."
-          style={{flex:1,padding:'5px 10px',fontSize:11,background:'var(--navy-900)',border:'1px solid rgba(255,255,255,.1)',borderRadius:7,color:'#fff',outline:'none'}}/>
-        <button className="btn btn-primary" disabled={disabled||!customText.trim()} onClick={onCustom}>✨ Classify</button>
-      </div>
-    </div>
-  );
-}
-
-/* ══════════════════ TICKET FEED ══════════════════ */
-function TicketFeed({tickets,activeId}){
-  return(
-    <div style={{flex:'0 0 auto',maxHeight:170,overflowY:'auto',padding:10}}>
-      {tickets.length===0&&<div style={{textAlign:'center',padding:20,color:'#475569',fontSize:11}}>No tickets yet. Inject a ticket to begin.</div>}
-      {tickets.map((t,i)=>(
-        <div key={t.id} className={`glass-dark anim-fade-up`} style={{padding:8,marginBottom:5,borderColor:t.id===activeId?'rgba(0,191,179,.35)':undefined,animationDelay:i*30+'ms'}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'start'}}>
-            <div style={{minWidth:0,flex:1}}>
-              <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:2}}>
-                <span style={{fontSize:9,fontFamily:'monospace',color:'#64748B'}}>{t.id}</span>
-                <span className={`sev-${t.severity.toLowerCase()}`} style={{fontSize:9,fontWeight:600}}>{t.severity}</span>
-                <span style={{fontSize:9,color:'#475569',background:'rgba(255,255,255,.04)',padding:'1px 5px',borderRadius:3}}>{t.stream}</span>
-              </div>
-              <div style={{fontSize:11,fontWeight:500,color:'#E2E8F0',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.title}</div>
-            </div>
-            <div style={{width:8,height:8,borderRadius:4,marginLeft:8,flexShrink:0,
-              background:t.status==='resolved'?'var(--green)':t.status==='hitl'?'var(--amber)':t.status==='escalated'?'var(--red)':'var(--teal)',
-            }} className={t.status==='processing'?'glow-teal':t.status==='hitl'?'glow-amber':''}/>
-          </div>
-        </div>
-      ))}
+    <div style={{padding:'8px 12px',borderBottom:'1px solid rgba(255,255,255,.05)',display:'flex',gap:6,alignItems:'center'}}>
+      <span style={{fontSize:11,color:'#64748B',flexShrink:0}}>🔍</span>
+      <input value={customText} onChange={e=>setCustomText(e.target.value)} disabled={disabled}
+        onKeyDown={e=>e.key==='Enter'&&customText.trim()&&onCustom()}
+        placeholder="Search or describe a new incident..."
+        style={{flex:1,padding:'6px 10px',fontSize:11,background:'rgba(255,255,255,.03)',border:'1px solid rgba(255,255,255,.08)',borderRadius:7,color:'#fff',outline:'none'}}/>
+      <button className="btn btn-primary" disabled={disabled||!customText.trim()} onClick={onCustom} style={{fontSize:11,padding:'5px 12px',flexShrink:0}}>Submit</button>
+      {disabled&&<span style={{fontSize:9,color:'var(--teal)',flexShrink:0}}>● Processing</span>}
     </div>
   );
 }
@@ -804,18 +841,18 @@ function BatchToast({onProcess,onDismiss}){
 /* ══════════════════ NARRATION BOX ══════════════════ */
 function NarrationBox({text,stepNum,total,onPrev,onNext,onStop,progress}){
   return(
-    <div className="glass anim-slide-up" style={{position:'fixed',bottom:20,right:20,zIndex:55,width:380,padding:16,borderColor:'rgba(0,191,179,.25)'}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+    <div className="anim-slide-up" style={{position:'fixed',bottom:20,right:20,zIndex:55,width:390,padding:18,background:'linear-gradient(135deg,rgba(32,56,92,.96),rgba(44,72,112,.94))',border:'1px solid rgba(0,191,179,.4)',borderRadius:14,backdropFilter:'blur(14px)',boxShadow:'0 8px 32px rgba(0,0,0,.55), 0 0 0 1px rgba(0,191,179,.08)'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
         <div style={{display:'flex',alignItems:'center',gap:6}}>
-          <div style={{width:7,height:7,borderRadius:4,background:'var(--teal)'}} className="glow-teal"/>
-          <span style={{fontSize:10,fontWeight:600,color:'var(--teal)',textTransform:'uppercase',letterSpacing:.5}}>Demo Narration</span>
+          <div style={{width:8,height:8,borderRadius:4,background:'var(--teal)'}} className="glow-teal"/>
+          <span style={{fontSize:11,fontWeight:600,color:'var(--teal)',textTransform:'uppercase',letterSpacing:.5}}>Demo Narration</span>
         </div>
-        <span style={{fontSize:10,color:'#64748B'}}>{stepNum+1} / {total}</span>
+        <span style={{fontSize:10,color:'#94A3B8',fontWeight:500}}>{stepNum+1} / {total}</span>
       </div>
-      <div style={{fontSize:12,color:'#E2E8F0',lineHeight:1.6,marginBottom:10,minHeight:50}}>{text}</div>
+      <div style={{fontSize:13,color:'#F1F5F9',lineHeight:1.65,marginBottom:12,minHeight:50}}>{text}</div>
       {/* Progress bar */}
-      <div style={{height:2,background:'rgba(255,255,255,.06)',borderRadius:1,marginBottom:10,overflow:'hidden'}}>
-        <div style={{height:2,background:'var(--teal)',borderRadius:1,width:progress+'%',transition:'width .3s linear'}}/>
+      <div style={{height:3,background:'rgba(255,255,255,.1)',borderRadius:2,marginBottom:12,overflow:'hidden'}}>
+        <div style={{height:3,background:'linear-gradient(90deg,var(--teal),#00D4C6)',borderRadius:2,width:progress+'%',transition:'width .3s linear'}}/>
       </div>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
         <div style={{display:'flex',gap:4}}>
@@ -900,7 +937,7 @@ function Dashboard({kpi,onGoDemo,onInjectFromDash}){
       <div className="glass" style={{padding:16,marginBottom:24}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
           <h3 style={{fontSize:12,fontWeight:600,color:'#E2E8F0'}}>Top Recurring Themes (Overall)</h3>
-          <span style={{fontSize:10,color:'#64748B'}}>Click a theme to resolve it live →</span>
+          <span style={{fontSize:10,color:'#64748B'}}>Click a theme to open in operations →</span>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10}}>
           {ASSESSMENT.themes.map((th,i)=>{
@@ -913,7 +950,7 @@ function Dashboard({kpi,onGoDemo,onInjectFromDash}){
                 <div style={{fontSize:18,fontWeight:700,color:'var(--teal)'}}>{fmt(th.count)}</div>
                 <div style={{fontSize:10,color:'#E2E8F0',marginTop:4,lineHeight:1.3}}>{th.label}</div>
                 <div style={{fontSize:9,color:'#22D3EE',marginTop:2}}>{th.codes}</div>
-                <div style={{fontSize:9,color:'var(--teal)',marginTop:6,opacity:.7}}>▶ Resolve Live</div>
+                <div style={{fontSize:9,color:'var(--teal)',marginTop:6,opacity:.7}}>▶ Process</div>
               </div>
             );
           })}
@@ -1175,67 +1212,24 @@ function App(){
         <div style={{flex:1,display:'flex',overflow:'hidden'}}>
           {/* Left 60% */}
           <div style={{width:'60%',display:'flex',flexDirection:'column',borderRight:'1px solid rgba(255,255,255,.05)'}}>
-            <TicketInjector onInject={inject} disabled={flow!=='idle'} customText={customText} setCustomText={setCustomText} onCustom={handleCustom}/>
-            {tickets.length===0 && flow==='idle' ? (
-              /* ── Welcome empty state ── */
-              <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:32,textAlign:'center',position:'relative',overflow:'hidden'}}>
-                <div style={{position:'absolute',inset:0,opacity:.03,backgroundImage:'radial-gradient(circle at 1px 1px,rgba(0,191,179,.5) 1px,transparent 0)',backgroundSize:'28px 28px'}}/>
-                <div style={{width:64,height:64,borderRadius:16,background:'linear-gradient(135deg,rgba(0,191,179,.15),rgba(0,191,179,.05))',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:16,border:'1px solid rgba(0,191,179,.2)'}}>
-                  <span style={{fontSize:28}}>🧠</span>
-                </div>
-                <h3 style={{fontSize:18,fontWeight:700,color:'#E2E8F0',marginBottom:6}}>Operations Center Ready</h3>
-                <p style={{fontSize:12,color:'#64748B',maxWidth:400,lineHeight:1.6,marginBottom:20}}>
-                  Select a ticket type above to watch Agent Zero classify, route, and resolve it in real time — or type a custom issue to see live AI classification.
-                </p>
-                <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,maxWidth:480,width:'100%',marginBottom:20}}>
-                  {[
-                    {k:'idoc',icon:'📨',label:'IDoc Failure',sub:'Most common (42,852)',clr:'#00BFB3'},
-                    {k:'billing',icon:'💳',label:'Billing Issue',sub:'HITL demo',clr:'#F5A623'},
-                    {k:'sales',icon:'🚚',label:'Delivery Failure',sub:'P1 priority',clr:'#8B5CF6'},
-                  ].map(t=>(
-                    <div key={t.k} onClick={()=>inject(t.k)} className="glass-dark"
-                      style={{padding:14,cursor:'pointer',textAlign:'center',transition:'all .2s',borderColor:'transparent'}}
-                      onMouseOver={e=>{e.currentTarget.style.borderColor=t.clr+'60';e.currentTarget.style.transform='translateY(-3px)'}}
-                      onMouseOut={e=>{e.currentTarget.style.borderColor='transparent';e.currentTarget.style.transform='none'}}>
-                      <div style={{fontSize:22,marginBottom:6}}>{t.icon}</div>
-                      <div style={{fontSize:11,fontWeight:600,color:'#E2E8F0'}}>{t.label}</div>
-                      <div style={{fontSize:9,color:t.clr,marginTop:3}}>{t.sub}</div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{display:'flex',alignItems:'center',gap:16,fontSize:10,color:'#475569'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:4}}>
-                    <div style={{width:8,height:8,borderRadius:4,background:'var(--teal)',opacity:.5}}/>
-                    Autonomous resolution
-                  </div>
-                  <div style={{display:'flex',alignItems:'center',gap:4}}>
-                    <div style={{width:8,height:8,borderRadius:4,background:'var(--amber)',opacity:.5}}/>
-                    Human-in-the-Loop
-                  </div>
-                  <div style={{display:'flex',alignItems:'center',gap:4}}>
-                    <div style={{width:8,height:8,borderRadius:4,background:'var(--green)',opacity:.5}}/>
-                    Batch processing
-                  </div>
-                </div>
+            <TicketInjector disabled={flow!=='idle'} customText={customText} setCustomText={setCustomText} onCustom={handleCustom}/>
+            {/* ── Ticket queue (always visible, capped height) ── */}
+            <div style={{flex:'0 0 auto',maxHeight:'40%',overflowY:'auto',borderBottom:'1px solid rgba(255,255,255,.05)'}}>
+              <LiveQueue tickets={tickets} activeId={active?.id} activeType={active?.type} onPick={inject} busy={flow!=='idle'}/>
+            </div>
+            {/* ── Orchestration canvas (always visible) ── */}
+            <div style={{flex:1,minHeight:200,display:'flex',flexDirection:'column'}}>
+              <div style={{padding:'6px 10px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <span style={{fontSize:9,color:'#64748B',textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Orchestration Flow</span>
+                {flow!=='idle'&&<span style={{fontSize:9,padding:'2px 8px',borderRadius:10,
+                  background:flow==='resolved'?'rgba(76,175,80,.1)':flow==='hitl'?'rgba(245,166,35,.1)':flow==='escalated'?'rgba(255,82,82,.1)':'rgba(0,191,179,.1)',
+                  color:flow==='resolved'?'var(--green)':flow==='hitl'?'var(--amber)':flow==='escalated'?'var(--red)':'var(--teal)',
+                }}>
+                  {flow==='analyzing'?'🔍 Analyzing':flow==='routing'?'🧠 Routing':flow==='processing'?'⚡ Processing':flow==='hitl'?'⚠️ Awaiting Human':flow==='resolved'?'✅ Resolved':'🔴 Escalated'}
+                </span>}
               </div>
-            ) : (
-              /* ── Active state with feed + canvas ── */
-              <>
-                <TicketFeed tickets={tickets} activeId={active?.id}/>
-                <div style={{borderTop:'1px solid rgba(255,255,255,.05)',flex:1,display:'flex',flexDirection:'column'}}>
-                  <div style={{padding:'6px 10px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                    <span style={{fontSize:9,color:'#64748B',textTransform:'uppercase',letterSpacing:1,fontWeight:500}}>Orchestration Flow</span>
-                    {flow!=='idle'&&<span style={{fontSize:9,padding:'2px 8px',borderRadius:10,
-                      background:flow==='resolved'?'rgba(76,175,80,.1)':flow==='hitl'?'rgba(245,166,35,.1)':flow==='escalated'?'rgba(255,82,82,.1)':'rgba(0,191,179,.1)',
-                      color:flow==='resolved'?'var(--green)':flow==='hitl'?'var(--amber)':flow==='escalated'?'var(--red)':'var(--teal)',
-                    }}>
-                      {flow==='analyzing'?'🔍 Analyzing':flow==='routing'?'🧠 Routing':flow==='processing'?'⚡ Processing':flow==='hitl'?'⚠️ Awaiting Human':flow==='resolved'?'✅ Resolved':'🔴 Escalated'}
-                    </span>}
-                  </div>
-                  <Canvas flowState={flow} activeTicket={active} stepIdx={stepIdx} agentName={agentName} agentColor={agentColor}/>
-                </div>
-              </>
-            )}
+              <Canvas flowState={flow} activeTicket={active} stepIdx={stepIdx} agentName={agentName} agentColor={agentColor}/>
+            </div>
           </div>
           {/* Right 40% */}
           <div style={{width:'40%',display:'flex',flexDirection:'column'}}>
